@@ -36,7 +36,7 @@
   .chk{font-size:13.5px;color:var(--mut);display:flex;gap:7px;align-items:center}
   .chip{margin-top:12px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:#F5F5F7;color:var(--navy);border-radius:980px;padding:7px 14px}
   .chip .dot{width:10px;height:10px;border-radius:50%;background:var(--navy);flex:none}
-  .chip.ref .dot{background:#2E6BD6}.chip.prep .dot{background:#84CC16}
+  .chip.ref .dot{background:#2E6BD6}.chip.prep .dot{background:#84CC16}.chip.occl .dot{background:#7A3E9D}
   .chip.ok{background:#EAF5EE;color:var(--verde)}.chip.ok .dot{background:var(--verde)}
   #canvasWrap{margin-top:12px;display:none;border-radius:10px;overflow:hidden;background:#0e1420;overscroll-behavior:contain}
   canvas{display:block;margin:0 auto;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -172,7 +172,7 @@
         <li>El orden no importa: la app detecta sola cuál lado es oclusal. Lo único fijo es que cada dos toques seguidos son la misma línea.</li>
         <li>Separa lo más posible los dos toques de cada línea: líneas largas dan ángulos más estables.</li>
         <li>Los puntos ya puestos quedan bloqueados (candadito). Para moverlos, toca Desbloquear, arrastra con la lupa y vuelve a bloquear.</li>
-        <li>Con "Tubo visible" desactivado se marcan solo las dos paredes preparadas (4 puntos): sirve para fotos sin tubo, pero sin compensación de perspectiva — foto perpendicular y con oclusal hacia arriba.</li>
+        <li>Con "Tubo visible" desactivado se marcan las dos paredes preparadas (4 puntos) más un 5° punto sobre el borde incisal/oclusal, que le indica a la app hacia dónde mira la preparación (sirve igual para maxilares y mandibulares). Sin tubo no hay compensación de perspectiva: foto lo más perpendicular posible.</li>
       </ol>
     </details>
   </div>
@@ -246,6 +246,7 @@
     <div id="regTableWrap"><div class="empty">Aún no hay mediciones guardadas.</div></div>
     <div class="row btns">
       <button class="pri" id="pdfBtn">Exportar PDF</button>
+      <button class="sec" id="sheetBtn" hidden>Enviar a planilla</button>
       <button class="sec" id="csvBtn">Exportar CSV</button>
       <button class="sec" id="clearBtn">Borrar todo</button>
     </div>
@@ -294,6 +295,11 @@
 
 <script>
 "use strict";
+/* === Planilla Google (opcional) ===
+   Pega entre las comillas la URL del Web App de Apps Script (termina en /exec).
+   Con la URL puesta, aparece el botón "Enviar a planilla" en Registros. */
+const SHEETS_URL = "";
+
 /* ---------- estado ---------- */
 const T = { vmin: 3, verde: 6, amar: 12 };
 const num = v => parseFloat(String(v ?? "").trim().replace(",", "."));
@@ -387,7 +393,7 @@ function renderRecords(){
     return `<tr>
       <td>${r.img?`<img class="th" src="${r.img}" alt="">`:"—"}</td>
       <td>${esc(r.alumno)||"—"}<br><span class="sm">${r.hora}</span></td>
-      <td>${esc(r.term)}${r.vista&&r.vista!=="única"?" · "+r.vista:""}<br><span class="sm">${r.origen}</span></td>
+      <td>${esc(r.term)}${r.vista&&r.vista!=="única"?" · "+r.vista:""}<br><span class="sm">${r.origen}${r.sync?" · ✓ planilla":""}</span></td>
       <td><span class="cotv t-${r.cls}">${fmt(r.cot)}°</span>${r.pa!==null?`<br><span class="sm">A ${fmt(r.pa)}° · B ${fmt(r.pb)}°</span>`:""}</td>
       <td><button class="ed" aria-label="Editar" data-ed="${i}">✎</button><button class="del" aria-label="Eliminar" data-del="${i}">✕</button></td>
     </tr>`;
@@ -420,6 +426,23 @@ $("eSave").addEventListener("click",()=>{
 });
 $("eClose").addEventListener("click",()=>$("editDlg").hidden=true);
 $("editDlg").addEventListener("click",e=>{ if(e.target.id==="editDlg") $("editDlg").hidden=true; });
+
+/* Planilla Google */
+if(SHEETS_URL){ $("sheetBtn").hidden=false; }
+$("sheetBtn").addEventListener("click",()=>{
+  if(!SHEETS_URL){ toast("Falta configurar la URL de la planilla"); return; }
+  const pend = records.filter(r=>!r.sync);
+  if(!pend.length){ toast("No hay registros nuevos que enviar"); return; }
+  const payload = pend.map(r=>({fecha:r.fecha,hora:r.hora,docente:r.docente||$("docente").value.trim(),
+    alumno:r.alumno,term:r.term,vista:r.vista,origen:r.origen,
+    pa:r.pa,pb:r.pb,dc:r.dc,dol:r.dol,h:r.h,cot:r.cot,resultado:r.label}));
+  fetch(SHEETS_URL,{method:"POST",mode:"no-cors",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({registros:payload})})
+  .then(()=>{ pend.forEach(r=>r.sync=true); renderRecords();
+    toast("Enviados "+pend.length+" registros — verifica la planilla"); })
+  .catch(()=>toast("No se pudo enviar: revisa la conexión o la URL"));
+});
 
 /* CSV */
 $("csvBtn").addEventListener("click",()=>{
@@ -501,7 +524,7 @@ const SEQ2 = [
   {g:"prep",t:"Pared preparada B — segundo extremo"}
 ];
 const SEQ1 = [SEQ2[0],SEQ2[1],SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
-const SEQ0 = [SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
+const SEQ0 = [SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7],{g:"occl",t:"Borde incisal/oclusal — un toque sobre ese borde"}];
 const tubo = () => $("tuboSw").checked;
 const refCount = () => tubo() ? ($("bothWalls").checked?4:2) : 0;
 const seq = () => tubo() ? ($("bothWalls").checked ? SEQ2 : SEQ1) : SEQ0;
@@ -628,12 +651,15 @@ function computeFoto(){
   const dot = (u,v)=>u.x*v.x+u.y*v.y;
   let a, delta=null, c;
   if(NR===0){
-    // sin tubo: eje = bisectriz de las paredes, asumiendo oclusal hacia arriba en la imagen
-    let wA=dirOf(prep[0],prep[1]); if(wA.y>0) wA=flip(wA);
-    let wB=dirOf(prep[2],prep[3]); if(wB.y>0) wB=flip(wB);
+    // sin tubo: eje = bisectriz de las paredes, orientada hacia el marcador incisal/oclusal
+    let wA=dirOf(prep[0],prep[1]);
+    let wB=dirOf(prep[2],prep[3]);
+    if(dot(wA,wB)<0) wB=flip(wB);
     const s={x:wA.x+wB.x,y:wA.y+wB.y}, m=Math.hypot(s.x,s.y)||1;
     a={x:s.x/m,y:s.y/m};
     c={ x: prep.reduce((s,p)=>s+p.x,0)/4, y: prep.reduce((s,p)=>s+p.y,0)/4 };
+    const occl=pts[4];
+    if(occl && dot(a,{x:occl.x-c.x,y:occl.y-c.y})<0) a=flip(a);
     const conv0 = i => {
       const p0=prep[i], p1=prep[i+1];
       let w=dirOf(p0,p1);
@@ -685,8 +711,8 @@ function refreshFoto(){
   }
   const w=[];
   if(r.noRef){
-    w.push('<div class="warn">Modo sin tubo: el resultado no compensa la inclinación de la cámara ni la distorsión de la foto. Toma la imagen lo más perpendicular posible y con oclusal hacia arriba.</div>');
-    if(r.cot<-0.3) w.push('<div class="warn red">Convergencia negativa: preparación divergente (retentiva) — o la imagen está con oclusal hacia abajo.</div>');
+    w.push('<div class="warn">Modo sin tubo: el resultado no compensa la inclinación de la cámara ni la distorsión de la foto. Toma la imagen lo más perpendicular posible.</div>');
+    if(r.cot<-0.3) w.push('<div class="warn red">Convergencia negativa: preparación divergente (retentiva).</div>');
   } else {
     if(r.pa<-0.3||r.pb<-0.3) w.push('<div class="warn red">Una pared es divergente: posible socavado. Verifícalo antes de calificar.</div>');
     if(Math.abs(r.pa-r.pb)>4) w.push('<div class="warn">Preparación asimétrica (paredes con más de 4° de diferencia): el eje de inserción queda inclinado.</div>');
@@ -754,6 +780,20 @@ function draw(dragging){
   }
   pts.forEach((p,i)=>{
     const s=toScr(p), ref=i<nRef, r=8.5*dpr;
+    if(nRef===0 && i===4){
+      // marcador incisal/oclusal: rombo morado con etiqueta
+      ctx.save();
+      ctx.translate(s.x,s.y); ctx.rotate(Math.PI/4);
+      ctx.fillStyle="#7A3E9D"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.8*dpr;
+      const q=6.5*dpr;
+      ctx.fillRect(-q,-q,2*q,2*q); ctx.strokeRect(-q,-q,2*q,2*q);
+      ctx.restore();
+      ctx.font="bold "+Math.round(11*dpr)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="bottom";
+      ctx.lineWidth=3.5*dpr; ctx.strokeStyle="rgba(255,255,255,.92)";
+      ctx.strokeText("Incisal/oclusal", s.x, s.y-11*dpr);
+      ctx.fillStyle="#7A3E9D"; ctx.fillText("Incisal/oclusal", s.x, s.y-11*dpr);
+      return;
+    }
     ctx.fillStyle = ref? "#2E6BD6":"#84CC16";
     ctx.strokeStyle="#fff"; ctx.lineWidth=1.8*dpr;
     ctx.beginPath(); ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.stroke();
@@ -782,7 +822,7 @@ function draw(dragging){
     ctx.translate(lx,ly); ctx.scale(Z,Z); ctx.translate(-ip.x*view.s-view.ox,-ip.y*view.s-view.oy);
     ctx.drawImage(img,view.ox,view.oy,img.naturalWidth*view.s,img.naturalHeight*view.s);
     ctx.restore();
-    const g = dragIdx<nRef? "#2E6BD6":"#84CC16";
+    const g = (nRef===0 && dragIdx===4)? "#7A3E9D" : (dragIdx<nRef? "#2E6BD6":"#84CC16");
     ctx.strokeStyle="#fff"; ctx.lineWidth=2.5*dpr;
     ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.stroke();
     ctx.strokeStyle=g; ctx.lineWidth=1.5*dpr;
@@ -810,7 +850,7 @@ $("fSave").addEventListener("click",()=>{
   addRecord({...s, alumno:$("alGlobal").value.trim(), docente:$("docente").value.trim(),
     term:$("fTerm").value, vista:$("fVista").value, origen:"foto",
     pa:lastFoto.noRef?null:lastFoto.pa, pb:lastFoto.noRef?null:lastFoto.pb, dc:null, dol:null, h:null,
-    cot:lastFotoCot, cls:b.cls, label:b.label, img:snapshot()});
+    cot:lastFotoCot, cls:b.cls, label:b.label, img:snapshot(), sync:false});
 });
 
 /* ================= CALCULADORA ================= */
@@ -833,7 +873,7 @@ $("cSave").addEventListener("click",()=>{
   addRecord({...s, alumno:$("alGlobal").value.trim(), docente:$("docente").value.trim(),
     term:$("cTerm").value, vista:"única", origen:"calibre",
     pa:null, pb:null, dc:lastCalcVals.dc, dol:lastCalcVals.dol, h:lastCalcVals.h,
-    cot:lastCalcCot, cls:b.cls, label:b.label, img:null});
+    cot:lastCalcCot, cls:b.cls, label:b.label, img:null, sync:false});
 });
 
 function fitEsc(){
