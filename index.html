@@ -242,6 +242,7 @@
     <div class="row" style="margin-bottom:10px">
       <div style="flex:1;min-width:150px"><label class="f" for="docente">Docente (se completa una vez)</label><input type="text" id="docente" autocomplete="off" placeholder="Nombre del docente"></div>
       <div style="flex:1;min-width:150px"><label class="f" for="filtAl">Filtrar por alumno/a</label><select id="filtAl"><option value="">Todos</option></select></div>
+      <div style="flex:1;min-width:150px"><label class="f" for="claveCurso">Clave del curso (para la planilla)</label><input type="password" id="claveCurso" autocomplete="off" placeholder="Clave acordada"></div>
     </div>
     <div id="regTableWrap"><div class="empty">Aún no hay mediciones guardadas.</div></div>
     <div class="row btns">
@@ -298,7 +299,7 @@
 /* === Planilla Google (opcional) ===
    Pega entre las comillas la URL del Web App de Apps Script (termina en /exec).
    Con la URL puesta, aparece el botón "Enviar a planilla" en Registros. */
-const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyLxmOgCZ1F8UqQ1hy7rUvNNtNBCeMlpASnnNtPdDlq1oNK0r6l4pq0CaVLqbWQEfMajg/exec";
+const SHEETS_URL = "";
 
 /* ---------- estado ---------- */
 const T = { vmin: 3, verde: 6, amar: 12 };
@@ -431,6 +432,8 @@ $("editDlg").addEventListener("click",e=>{ if(e.target.id==="editDlg") $("editDl
 if(SHEETS_URL){ $("sheetBtn").hidden=false; }
 $("sheetBtn").addEventListener("click",()=>{
   if(!SHEETS_URL){ toast("Falta configurar la URL de la planilla"); return; }
+  const clave = $("claveCurso").value.trim();
+  if(!clave){ toast("Ingresa la clave del curso antes de enviar"); return; }
   const pend = records.filter(r=>!r.sync);
   if(!pend.length){ toast("No hay registros nuevos que enviar"); return; }
   const payload = pend.map(r=>({fecha:r.fecha,hora:r.hora,docente:r.docente||$("docente").value.trim(),
@@ -438,7 +441,7 @@ $("sheetBtn").addEventListener("click",()=>{
     pa:r.pa,pb:r.pb,dc:r.dc,dol:r.dol,h:r.h,cot:r.cot,resultado:r.label}));
   fetch(SHEETS_URL,{method:"POST",mode:"no-cors",
     headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({registros:payload})})
+    body:JSON.stringify({clave:clave, registros:payload})})
   .then(()=>{ pend.forEach(r=>r.sync=true); renderRecords();
     toast("Enviados "+pend.length+" registros — verifica la planilla"); })
   .catch(()=>toast("No se pudo enviar: revisa la conexión o la URL"));
