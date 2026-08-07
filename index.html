@@ -8,7 +8,7 @@
   :root{
     --paper:#FFFFFF; --card:#FFFFFF; --ink:#1D1D1F; --mut:#6E6E73; --mut3:#86868B;
     --navy:#1d4357; --line:#D2D2D7;
-    --verde:#1E8A4C; --ambar:#C7860B; --rojo:#C03426; --mor:#7A3E9D;
+    --verde:#1E8A4C; --ambar:#C7860B; --rojo:#C03426; --mor:#7A1F3D;
     --mono:"SF Mono",SFMono-Regular,ui-monospace,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -38,7 +38,7 @@
   .chk{font-size:13.5px;color:var(--mut);display:flex;gap:7px;align-items:center}
   .chip{margin-top:12px;display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;background:#F5F5F7;color:var(--navy);border-radius:980px;padding:7px 14px}
   .chip .dot{width:10px;height:10px;border-radius:50%;background:var(--navy);flex:none}
-  .chip.ref .dot{background:#2E6BD6}.chip.prep .dot{background:#84CC16}.chip.occl .dot{background:#7A3E9D}
+  .chip.ref .dot{background:#2E6BD6}.chip.prep .dot{background:#84CC16}.chip.occl .dot{background:#7A1F3D}
   .chip.ok{background:#EAF5EE;color:var(--verde)}.chip.ok .dot{background:var(--verde)}
   #canvasWrap{margin-top:12px;display:none;border-radius:10px;overflow:hidden;background:#0e1420;overscroll-behavior:contain}
   canvas{display:block;margin:0 auto;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -817,7 +817,7 @@ function draw(dragging){
   };
   wallLabel(nRef,"A"); wallLabel(nRef+2,"B");
   if(pts.length===S.length){
-    const r=lastFoto||computeFoto();
+    const r=computeFoto();
     const c=toScr(r.c), L=cv.height;
     ctx.save(); ctx.setLineDash([9*dpr,7*dpr]); ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=1.5*dpr;
     ctx.beginPath();
@@ -832,10 +832,10 @@ function draw(dragging){
       ctx.lineCap="round";
       ctx.strokeStyle="#fff"; ctx.lineWidth=5*dpr;
       ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(hd.x,hd.y); ctx.stroke();
-      ctx.strokeStyle="#7A3E9D"; ctx.lineWidth=2.6*dpr;
+      ctx.strokeStyle="#7A1F3D"; ctx.lineWidth=2.6*dpr;
       ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(hd.x,hd.y); ctx.stroke();
       const px=-ax.y, py=ax.x, s2=7*dpr;
-      ctx.fillStyle="#7A3E9D"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.6*dpr;
+      ctx.fillStyle="#7A1F3D"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.6*dpr;
       ctx.beginPath();
       ctx.moveTo(tip.x,tip.y);
       ctx.lineTo(hd.x+px*s2, hd.y+py*s2);
@@ -847,7 +847,7 @@ function draw(dragging){
       ctx.font="bold "+Math.round(11*dpr)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.lineWidth=3.5*dpr; ctx.strokeStyle="rgba(255,255,255,.92)";
       ctx.strokeText("Incisal / Oclusal", lx2, ly2);
-      ctx.fillStyle="#7A3E9D"; ctx.fillText("Incisal / Oclusal", lx2, ly2);
+      ctx.fillStyle="#7A1F3D"; ctx.fillText("Incisal / Oclusal", lx2, ly2);
     }
   }
   pts.forEach((p,i)=>{
