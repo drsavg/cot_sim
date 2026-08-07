@@ -17,6 +17,8 @@
   html{background:var(--paper);min-height:100%}
   body{min-height:100vh;background:var(--paper);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:24px}
   header{background:var(--card);border-bottom:1px solid var(--line);padding:16px;display:flex;gap:14px;align-items:center}
+  .docChip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;background:#EEF2F5;color:var(--navy);border-radius:980px;padding:4px 12px;font-size:11.5px;font-weight:600}
+  .docChip .okmark{color:#1E8A4C;font-weight:800}
   .escwrap{flex:none;display:flex;align-items:center}
   .escwrap img{height:72px;width:auto;opacity:.75}
   .head-t{flex:1;min-width:0}
@@ -131,6 +133,7 @@
     <div class="eyebrow">Facultad de Odontología · Universidad de Chile</div>
     <h1>Convergencia oclusal total (COT)</h1>
     <div class="sub">Preparación biológica en tubo de acrílico · Prótesis Fija</div>
+    <div id="docChip" class="docChip" hidden></div>
   </div>
   <button id="gearBtn" aria-label="Ajustar umbrales">⚙</button>
 </header>
@@ -299,7 +302,7 @@
 /* === Planilla Google (opcional) ===
    Pega entre las comillas la URL del Web App de Apps Script (termina en /exec).
    Con la URL puesta, aparece el botón "Enviar a planilla" en Registros. */
-const SHEETS_URL = "";
+const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyLxmOgCZ1F8UqQ1hy7rUvNNtNBCeMlpASnnNtPdDlq1oNK0r6l4pq0CaVLqbWQEfMajg/exec";
 
 /* ---------- estado ---------- */
 const T = { vmin: 3, verde: 6, amar: 12 };
@@ -430,21 +433,46 @@ $("editDlg").addEventListener("click",e=>{ if(e.target.id==="editDlg") $("editDl
 
 /* Planilla Google */
 if(SHEETS_URL){ $("sheetBtn").hidden=false; }
+let claveOk=false;
+function updateDocChip(){
+  const n=$("docente").value.trim();
+  const chip=$("docChip");
+  if(!n && !claveOk){ chip.hidden=true; }
+  else{
+    chip.hidden=false;
+    chip.innerHTML=(n? "Dr(a). "+esc(n):"Docente")+(claveOk? ' <span class="okmark" title="clave validada">✓</span>':"");
+  }
+  fitEsc();
+}
+$("docente").addEventListener("input",updateDocChip);
+function validarClave(){
+  const clave=$("claveCurso").value.trim();
+  if(!clave){ claveOk=false; updateDocChip(); return Promise.resolve(false); }
+  return fetch(SHEETS_URL+"?clave="+encodeURIComponent(clave))
+    .then(r=>r.json())
+    .then(j=>{ claveOk=!!j.ok; toast(claveOk? "Clave validada ✓":"Clave incorrecta"); updateDocChip(); return claveOk; })
+    .catch(()=>{ toast("No se pudo validar la clave: revisa la conexión"); return false; });
+}
+$("claveCurso").addEventListener("change",validarClave);
+$("claveCurso").addEventListener("input",()=>{ if(claveOk){ claveOk=false; updateDocChip(); } });
 $("sheetBtn").addEventListener("click",()=>{
   if(!SHEETS_URL){ toast("Falta configurar la URL de la planilla"); return; }
   const clave = $("claveCurso").value.trim();
   if(!clave){ toast("Ingresa la clave del curso antes de enviar"); return; }
-  const pend = records.filter(r=>!r.sync);
-  if(!pend.length){ toast("No hay registros nuevos que enviar"); return; }
-  const payload = pend.map(r=>({fecha:r.fecha,hora:r.hora,docente:r.docente||$("docente").value.trim(),
-    alumno:r.alumno,term:r.term,vista:r.vista,origen:r.origen,
-    pa:r.pa,pb:r.pb,dc:r.dc,dol:r.dol,h:r.h,cot:r.cot,resultado:r.label}));
-  fetch(SHEETS_URL,{method:"POST",mode:"no-cors",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({clave:clave, registros:payload})})
-  .then(()=>{ pend.forEach(r=>r.sync=true); renderRecords();
-    toast("Enviados "+pend.length+" registros — verifica la planilla"); })
-  .catch(()=>toast("No se pudo enviar: revisa la conexión o la URL"));
+  const go = () => {
+    const pend = records.filter(r=>!r.sync);
+    if(!pend.length){ toast("No hay registros nuevos que enviar"); return; }
+    const payload = pend.map(r=>({fecha:r.fecha,hora:r.hora,docente:r.docente||$("docente").value.trim(),
+      alumno:r.alumno,term:r.term,vista:r.vista,origen:r.origen,
+      pa:r.pa,pb:r.pb,dc:r.dc,dol:r.dol,h:r.h,cot:r.cot,resultado:r.label}));
+    fetch(SHEETS_URL,{method:"POST",mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({clave:clave, registros:payload})})
+    .then(()=>{ pend.forEach(r=>r.sync=true); renderRecords();
+      toast("Enviados a la planilla — verifica la hoja"); })
+    .catch(()=>toast("No se pudo enviar: revisa la conexión o la URL"));
+  };
+  if(claveOk) go(); else validarClave().then(ok=>{ if(ok) go(); });
 });
 
 /* CSV */
