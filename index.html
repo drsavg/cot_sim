@@ -166,6 +166,7 @@
       <button class="sec" id="lockBtn">🔓 Desbloquear</button>
       <button class="sec" id="undoBtn" title="Deshacer último punto" aria-label="Deshacer último punto">↺</button>
       <button class="sec" id="resetPts">Reiniciar puntos</button>
+      <button class="sec" id="flipOccl" hidden>Cambiar Incisal / Oclusal</button>
     </div>
     <details>
       <summary>¿Qué puntos marco?</summary>
@@ -175,7 +176,7 @@
         <li>El orden no importa: la app detecta sola cuál lado es oclusal. Lo único fijo es que cada dos toques seguidos son la misma línea.</li>
         <li>Separa lo más posible los dos toques de cada línea: líneas largas dan ángulos más estables.</li>
         <li>Los puntos ya puestos quedan bloqueados (candadito). Para moverlos, toca Desbloquear, arrastra con la lupa y vuelve a bloquear.</li>
-        <li>Con "Tubo visible" desactivado se marcan las dos paredes preparadas (4 puntos) más un 5° punto sobre el borde incisal/oclusal, que le indica a la app hacia dónde mira la preparación (sirve igual para maxilares y mandibulares). Sin tubo no hay compensación de perspectiva: foto lo más perpendicular posible.</li>
+        <li>Con "Tubo visible" desactivado se marcan solo las dos paredes preparadas (4 puntos). Sobre el eje aparece una flecha "Incisal / Oclusal": si apunta al extremo equivocado, tócala o usa el botón "Cambiar Incisal / Oclusal" (sirve igual para maxilares y mandibulares). Sin tubo no hay compensación de perspectiva: foto lo más perpendicular posible.</li>
       </ol>
     </details>
   </div>
@@ -542,7 +543,7 @@ $("uClose").addEventListener("click",()=>{ $("gearDlg").hidden=true; });
 /* ================= FOTO ================= */
 const cv=$("cv"), ctx=cv.getContext("2d");
 let img=null, view={s:1,ox:0,oy:0}, pts=[], dragIdx=-1, dragPos=null, lastFotoCot=null, lastFoto=null;
-let locked=true, freeIdx=-1;
+let locked=true, freeIdx=-1, occlDown=false;
 
 const SEQ2 = [
   {g:"ref", t:"Borde sin tallar 1 — primer extremo"},
@@ -555,17 +556,17 @@ const SEQ2 = [
   {g:"prep",t:"Pared preparada B — segundo extremo"}
 ];
 const SEQ1 = [SEQ2[0],SEQ2[1],SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
-const SEQ0 = [SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7],{g:"occl",t:"Borde incisal/oclusal — un toque sobre ese borde"}];
+const SEQ0 = [SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
 const tubo = () => $("tuboSw").checked;
 const refCount = () => tubo() ? ($("bothWalls").checked?4:2) : 0;
 const seq = () => tubo() ? ($("bothWalls").checked ? SEQ2 : SEQ1) : SEQ0;
 
 function syncLock(){ $("lockBtn").textContent = locked? "🔓 Desbloquear" : "🔒 Bloquear"; }
 
-$("bothWalls").addEventListener("change",()=>{ pts=[]; locked=true; freeIdx=-1; syncLock(); updateFoto(); });
+$("bothWalls").addEventListener("change",()=>{ pts=[]; locked=true; freeIdx=-1; occlDown=false; syncLock(); updateFoto(); });
 $("tuboSw").addEventListener("change",()=>{
   $("bordesLbl").style.display = tubo()? "flex":"none";
-  pts=[]; locked=true; freeIdx=-1; syncLock(); updateFoto();
+  pts=[]; locked=true; freeIdx=-1; occlDown=false; syncLock(); updateFoto();
 });
 
 $("file").addEventListener("change",e=>{
@@ -573,7 +574,7 @@ $("file").addEventListener("change",e=>{
   const rd=new FileReader();
   rd.onload=()=>{
     const im=new Image();
-    im.onload=()=>{ img=im; pts=[]; locked=true; freeIdx=-1; syncLock(); $("canvasWrap").style.display="block"; $("ptBtns").style.display="flex"; fit(); updateFoto(); };
+    im.onload=()=>{ img=im; pts=[]; locked=true; freeIdx=-1; occlDown=false; syncLock(); $("canvasWrap").style.display="block"; $("ptBtns").style.display="flex"; fit(); updateFoto(); };
     im.onerror=()=>toast("No se pudo leer la imagen");
     im.src=rd.result;
   };
@@ -620,7 +621,15 @@ cv.addEventListener("pointerdown",e=>{
   }
   if(best>=0){ dragIdx=best; }
   else if(placing){ pts.push(toImg(p.x,p.y)); freeIdx=pts.length-1; dragIdx=freeIdx; }
-  else return;
+  else {
+    if(refCount()===0 && lastFoto){
+      const k=cv.width/cv.getBoundingClientRect().width;
+      const cs=toScr(lastFoto.c);
+      const mx=cs.x+lastFoto.axis.x*20*k, my=cs.y+lastFoto.axis.y*20*k;
+      if(Math.hypot(p.x-mx,p.y-my) < 48*k){ toggleOccl(); }
+    }
+    return;
+  }
   dragPos=p; pts[dragIdx]=toImg(p.x,p.y); updateFoto(true);
 });
 cv.addEventListener("pointermove",e=>{
@@ -652,10 +661,17 @@ $("lockBtn").addEventListener("click",()=>{
   toast(locked? "Puntos bloqueados: tocar solo agrega nuevos" : "Puntos desbloqueados: arrastra para editar");
 });
 $("undoBtn").addEventListener("click",()=>{ if(!pts.length) return; pts.pop(); freeIdx=-1; updateFoto(); });
-$("resetPts").addEventListener("click",()=>{ pts=[]; locked=true; freeIdx=-1; syncLock(); updateFoto(); });
+$("resetPts").addEventListener("click",()=>{ pts=[]; locked=true; freeIdx=-1; occlDown=false; syncLock(); updateFoto(); });
+function toggleOccl(){
+  occlDown=!occlDown;
+  updateFoto();
+  toast("Incisal / Oclusal apunta ahora al otro extremo");
+}
+$("flipOccl").addEventListener("click",toggleOccl);
 
 function updateFoto(dragging){
   draw(dragging);
+  $("flipOccl").hidden = !(img && refCount()===0 && pts.length===seq().length);
   const S=seq(), chip=$("stepChip");
   if(!img){ $("stepTxt").textContent="Carga una foto para empezar"; chip.className="chip"; return; }
   if(pts.length<S.length){
@@ -689,8 +705,8 @@ function computeFoto(){
     const s={x:wA.x+wB.x,y:wA.y+wB.y}, m=Math.hypot(s.x,s.y)||1;
     a={x:s.x/m,y:s.y/m};
     c={ x: prep.reduce((s,p)=>s+p.x,0)/4, y: prep.reduce((s,p)=>s+p.y,0)/4 };
-    const occl=pts[4];
-    if(occl && dot(a,{x:occl.x-c.x,y:occl.y-c.y})<0) a=flip(a);
+    if(a.y>0) a=flip(a);      // por defecto la flecha apunta hacia arriba
+    if(occlDown) a=flip(a);   // invertida por el usuario
     const conv0 = i => {
       const p0=prep[i], p1=prep[i+1];
       let w=dirOf(p0,p1);
@@ -743,7 +759,7 @@ function refreshFoto(){
   const w=[];
   if(r.noRef){
     w.push('<div class="warn">Modo sin tubo: el resultado no compensa la inclinación de la cámara ni la distorsión de la foto. Toma la imagen lo más perpendicular posible.</div>');
-    if(r.cot<-0.3) w.push('<div class="warn red">Convergencia negativa: preparación divergente (retentiva).</div>');
+    if(r.cot<-0.3) w.push('<div class="warn red">Convergencia negativa: preparación divergente (retentiva) — o la flecha Incisal / Oclusal apunta al lado equivocado: tócala o usa el botón para invertirla.</div>');
   } else {
     if(r.pa<-0.3||r.pb<-0.3) w.push('<div class="warn red">Una pared es divergente: posible socavado. Verifícalo antes de calificar.</div>');
     if(Math.abs(r.pa-r.pb)>4) w.push('<div class="warn">Preparación asimétrica (paredes con más de 4° de diferencia): el eje de inserción queda inclinado.</div>');
@@ -808,23 +824,34 @@ function draw(dragging){
     ctx.moveTo(c.x-r.axis.x*L, c.y-r.axis.y*L);
     ctx.lineTo(c.x+r.axis.x*L, c.y+r.axis.y*L);
     ctx.stroke(); ctx.restore();
+    if(nRef===0){
+      const ax=r.axis;
+      const tl={x:c.x-ax.x*16*dpr, y:c.y-ax.y*16*dpr};
+      const hd={x:c.x+ax.x*34*dpr, y:c.y+ax.y*34*dpr};
+      const tip={x:hd.x+ax.x*11*dpr, y:hd.y+ax.y*11*dpr};
+      ctx.lineCap="round";
+      ctx.strokeStyle="#fff"; ctx.lineWidth=5*dpr;
+      ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(hd.x,hd.y); ctx.stroke();
+      ctx.strokeStyle="#7A3E9D"; ctx.lineWidth=2.6*dpr;
+      ctx.beginPath(); ctx.moveTo(tl.x,tl.y); ctx.lineTo(hd.x,hd.y); ctx.stroke();
+      const px=-ax.y, py=ax.x, s2=7*dpr;
+      ctx.fillStyle="#7A3E9D"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.6*dpr;
+      ctx.beginPath();
+      ctx.moveTo(tip.x,tip.y);
+      ctx.lineTo(hd.x+px*s2, hd.y+py*s2);
+      ctx.lineTo(hd.x-px*s2, hd.y-py*s2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      let lx2=tip.x+ax.x*20*dpr, ly2=tip.y+ax.y*20*dpr;
+      lx2=Math.max(56*dpr,Math.min(cv.width-56*dpr,lx2));
+      ly2=Math.max(12*dpr,Math.min(cv.height-12*dpr,ly2));
+      ctx.font="bold "+Math.round(11*dpr)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.lineWidth=3.5*dpr; ctx.strokeStyle="rgba(255,255,255,.92)";
+      ctx.strokeText("Incisal / Oclusal", lx2, ly2);
+      ctx.fillStyle="#7A3E9D"; ctx.fillText("Incisal / Oclusal", lx2, ly2);
+    }
   }
   pts.forEach((p,i)=>{
     const s=toScr(p), ref=i<nRef, r=8.5*dpr;
-    if(nRef===0 && i===4){
-      // marcador incisal/oclusal: rombo morado con etiqueta
-      ctx.save();
-      ctx.translate(s.x,s.y); ctx.rotate(Math.PI/4);
-      ctx.fillStyle="#7A3E9D"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.8*dpr;
-      const q=6.5*dpr;
-      ctx.fillRect(-q,-q,2*q,2*q); ctx.strokeRect(-q,-q,2*q,2*q);
-      ctx.restore();
-      ctx.font="bold "+Math.round(11*dpr)+"px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="bottom";
-      ctx.lineWidth=3.5*dpr; ctx.strokeStyle="rgba(255,255,255,.92)";
-      ctx.strokeText("Incisal/oclusal", s.x, s.y-11*dpr);
-      ctx.fillStyle="#7A3E9D"; ctx.fillText("Incisal/oclusal", s.x, s.y-11*dpr);
-      return;
-    }
     ctx.fillStyle = ref? "#2E6BD6":"#84CC16";
     ctx.strokeStyle="#fff"; ctx.lineWidth=1.8*dpr;
     ctx.beginPath(); ctx.arc(s.x,s.y,r,0,7); ctx.fill(); ctx.stroke();
@@ -853,7 +880,7 @@ function draw(dragging){
     ctx.translate(lx,ly); ctx.scale(Z,Z); ctx.translate(-ip.x*view.s-view.ox,-ip.y*view.s-view.oy);
     ctx.drawImage(img,view.ox,view.oy,img.naturalWidth*view.s,img.naturalHeight*view.s);
     ctx.restore();
-    const g = (nRef===0 && dragIdx===4)? "#7A3E9D" : (dragIdx<nRef? "#2E6BD6":"#84CC16");
+    const g = dragIdx<nRef? "#2E6BD6":"#84CC16";
     ctx.strokeStyle="#fff"; ctx.lineWidth=2.5*dpr;
     ctx.beginPath(); ctx.arc(lx,ly,R,0,7); ctx.stroke();
     ctx.strokeStyle=g; ctx.lineWidth=1.5*dpr;
