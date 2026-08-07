@@ -153,7 +153,8 @@
   <div class="card">
     <div class="row">
       <label class="filebtn">Tomar o elegir foto<input type="file" id="file" accept="image/*"></label>
-      <label class="chk"><input type="checkbox" id="bothWalls" checked> El tubo conserva sus dos bordes sin tallar</label>
+      <label class="chk"><input type="checkbox" id="tuboSw" checked> Tubo visible en la foto</label>
+      <label class="chk" id="bordesLbl"><input type="checkbox" id="bothWalls" checked> Conserva sus dos bordes sin tallar</label>
     </div>
     <div id="stepChip" class="chip"><span class="dot"></span><span id="stepTxt">Carga una foto para empezar</span></div>
     <div id="canvasWrap"><canvas id="cv"></canvas></div>
@@ -171,6 +172,7 @@
         <li>El orden no importa: la app detecta sola cuál lado es oclusal. Lo único fijo es que cada dos toques seguidos son la misma línea.</li>
         <li>Separa lo más posible los dos toques de cada línea: líneas largas dan ángulos más estables.</li>
         <li>Los puntos ya puestos quedan bloqueados (candadito). Para moverlos, toca Desbloquear, arrastra con la lupa y vuelve a bloquear.</li>
+        <li>Con "Tubo visible" desactivado se marcan solo las dos paredes preparadas (4 puntos): sirve para fotos sin tubo, pero sin compensación de perspectiva — foto perpendicular y con oclusal hacia arriba.</li>
       </ol>
     </details>
   </div>
@@ -499,11 +501,18 @@ const SEQ2 = [
   {g:"prep",t:"Pared preparada B — segundo extremo"}
 ];
 const SEQ1 = [SEQ2[0],SEQ2[1],SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
-const seq = () => $("bothWalls").checked ? SEQ2 : SEQ1;
+const SEQ0 = [SEQ2[4],SEQ2[5],SEQ2[6],SEQ2[7]];
+const tubo = () => $("tuboSw").checked;
+const refCount = () => tubo() ? ($("bothWalls").checked?4:2) : 0;
+const seq = () => tubo() ? ($("bothWalls").checked ? SEQ2 : SEQ1) : SEQ0;
 
 function syncLock(){ $("lockBtn").textContent = locked? "🔓 Desbloquear" : "🔒 Bloquear"; }
 
 $("bothWalls").addEventListener("change",()=>{ pts=[]; locked=true; freeIdx=-1; syncLock(); updateFoto(); });
+$("tuboSw").addEventListener("change",()=>{
+  $("bordesLbl").style.display = tubo()? "flex":"none";
+  pts=[]; locked=true; freeIdx=-1; syncLock(); updateFoto();
+});
 
 $("file").addEventListener("change",e=>{
   const f=e.target.files && e.target.files[0]; if(!f) return;
@@ -612,22 +621,40 @@ function signedAng(a,w){ return Math.atan2(a.x*w.y-a.y*w.x, a.x*w.x+a.y*w.y); }
 const deg = r => r*180/Math.PI;
 
 function computeFoto(){
-  const both=$("bothWalls").checked;
-  const refPts = both? pts.slice(0,4): pts.slice(0,2);
-  const prep = both? pts.slice(4,8): pts.slice(2,6);
+  const NR = refCount();
+  const refPts = pts.slice(0,NR);
+  const prep = pts.slice(NR,NR+4);
   const flip = v => ({x:-v.x,y:-v.y});
   const dot = (u,v)=>u.x*v.x+u.y*v.y;
+  let a, delta=null, c;
+  if(NR===0){
+    // sin tubo: eje = bisectriz de las paredes, asumiendo oclusal hacia arriba en la imagen
+    let wA=dirOf(prep[0],prep[1]); if(wA.y>0) wA=flip(wA);
+    let wB=dirOf(prep[2],prep[3]); if(wB.y>0) wB=flip(wB);
+    const s={x:wA.x+wB.x,y:wA.y+wB.y}, m=Math.hypot(s.x,s.y)||1;
+    a={x:s.x/m,y:s.y/m};
+    c={ x: prep.reduce((s,p)=>s+p.x,0)/4, y: prep.reduce((s,p)=>s+p.y,0)/4 };
+    const conv0 = i => {
+      const p0=prep[i], p1=prep[i+1];
+      let w=dirOf(p0,p1);
+      if(dot(a,w)<0) w=flip(w);
+      const m2={x:(p0.x+p1.x)/2,y:(p0.y+p1.y)/2};
+      const side=Math.sign(a.x*(m2.y-c.y)-a.y*(m2.x-c.x))||1;
+      return -side*deg(signedAng(a,w));
+    };
+    const cot0=conv0(0)+conv0(2);
+    return {pa:null,pb:null,cot:cot0,delta:null,axis:a,c,noRef:true};
+  }
   let d1 = dirOf(refPts[0],refPts[1]);
-  let a, delta=null;
-  if(both){
+  if(NR===4){
     let d2 = dirOf(refPts[2],refPts[3]);
     if(dot(d1,d2)<0) d2=flip(d2);
     delta = Math.abs(deg(signedAng(d1,d2)));
     const s={x:d1.x+d2.x,y:d1.y+d2.y}, m=Math.hypot(s.x,s.y)||1;
     a={x:s.x/m,y:s.y/m};
   } else a=d1;
-  const c = { x: refPts.reduce((s,p)=>s+p.x,0)/refPts.length,
-              y: refPts.reduce((s,p)=>s+p.y,0)/refPts.length };
+  c = { x: refPts.reduce((s,p)=>s+p.x,0)/refPts.length,
+        y: refPts.reduce((s,p)=>s+p.y,0)/refPts.length };
   const pc = { x: prep.reduce((s,p)=>s+p.x,0)/prep.length,
                y: prep.reduce((s,p)=>s+p.y,0)/prep.length };
   // oclusal es hacia donde está la preparación respecto del cuerpo
@@ -641,7 +668,7 @@ function computeFoto(){
     return -side*deg(signedAng(a,w));
   };
   const pa=conv(0), pb=conv(2);
-  return {pa,pb,cot:pa+pb,delta,axis:a,c};
+  return {pa,pb,cot:pa+pb,delta,axis:a,c,noRef:false};
 }
 
 function refreshFoto(){
@@ -649,12 +676,22 @@ function refreshFoto(){
   lastFoto=r; lastFotoCot=r.cot;
   $("fotoResult").hidden=false;
   showResult("f", r.cot);
-  $("fA").textContent=fmt(r.pa)+"°"; $("fB").textContent=fmt(r.pb)+"°";
-  $("fDelta").textContent = r.delta!==null? "Δ referencias "+fmt(r.delta)+"°" : "1 borde de referencia";
+  if(r.noRef){
+    $("fA").textContent="—"; $("fB").textContent="—";
+    $("fDelta").textContent="sin eje de referencia (modo sin tubo)";
+  } else {
+    $("fA").textContent=fmt(r.pa)+"°"; $("fB").textContent=fmt(r.pb)+"°";
+    $("fDelta").textContent = r.delta!==null? "Δ referencias "+fmt(r.delta)+"°" : "1 borde de referencia";
+  }
   const w=[];
-  if(r.pa<-0.3||r.pb<-0.3) w.push('<div class="warn red">Una pared es divergente: posible socavado. Verifícalo antes de calificar.</div>');
-  if(Math.abs(r.pa-r.pb)>4) w.push('<div class="warn">Preparación asimétrica (paredes con más de 4° de diferencia): el eje de inserción queda inclinado.</div>');
-  if(r.delta!==null&&r.delta>3) w.push('<div class="warn">Los bordes de referencia no se ven paralelos (Δ '+fmt(r.delta)+'°). Revisa el encuadre de la foto o la conicidad del propio tubo.</div>');
+  if(r.noRef){
+    w.push('<div class="warn">Modo sin tubo: el resultado no compensa la inclinación de la cámara ni la distorsión de la foto. Toma la imagen lo más perpendicular posible y con oclusal hacia arriba.</div>');
+    if(r.cot<-0.3) w.push('<div class="warn red">Convergencia negativa: preparación divergente (retentiva) — o la imagen está con oclusal hacia abajo.</div>');
+  } else {
+    if(r.pa<-0.3||r.pb<-0.3) w.push('<div class="warn red">Una pared es divergente: posible socavado. Verifícalo antes de calificar.</div>');
+    if(Math.abs(r.pa-r.pb)>4) w.push('<div class="warn">Preparación asimétrica (paredes con más de 4° de diferencia): el eje de inserción queda inclinado.</div>');
+    if(r.delta!==null&&r.delta>3) w.push('<div class="warn">Los bordes de referencia no se ven paralelos (Δ '+fmt(r.delta)+'°). Revisa el encuadre de la foto o la conicidad del propio tubo.</div>');
+  }
   const L=Math.max(img.naturalWidth,img.naturalHeight);
   let shortLine=false;
   for(let i=0;i+1<pts.length;i+=2){
@@ -669,8 +706,8 @@ function draw(dragging){
   const dpr=window.devicePixelRatio||1;
   ctx.clearRect(0,0,cv.width,cv.height);
   ctx.drawImage(img,view.ox,view.oy,img.naturalWidth*view.s,img.naturalHeight*view.s);
-  const S=seq(), both=$("bothWalls").checked;
-  const nRef = both?4:2;
+  const S=seq();
+  const nRef = refCount();
   const quadSeg=(A0,A1,B0,B1,fill)=>{
     const same=((A1.x-A0.x)*(B1.x-B0.x)+(A1.y-A0.y)*(B1.y-B0.y))>=0;
     const P=[A0,A1,same?B1:B0,same?B0:B1].map(toScr);
@@ -678,7 +715,7 @@ function draw(dragging){
     for(let k=1;k<4;k++) ctx.lineTo(P[k].x,P[k].y);
     ctx.closePath(); ctx.fill();
   };
-  if(both && pts.length>=4) quadSeg(pts[0],pts[1],pts[2],pts[3],"rgba(46,107,214,.12)");
+  if(nRef===4 && pts.length>=4) quadSeg(pts[0],pts[1],pts[2],pts[3],"rgba(46,107,214,.12)");
   if(pts.length>=nRef+4) quadSeg(pts[nRef],pts[nRef+1],pts[nRef+2],pts[nRef+3],"rgba(132,204,22,.13)");
   for(let i=0;i+1<pts.length;i+=2){
     const A=toScr(pts[i]), B=toScr(pts[i+1]);
@@ -772,7 +809,7 @@ $("fSave").addEventListener("click",()=>{
   const b=bandOf(lastFotoCot), s=stamp();
   addRecord({...s, alumno:$("alGlobal").value.trim(), docente:$("docente").value.trim(),
     term:$("fTerm").value, vista:$("fVista").value, origen:"foto",
-    pa:lastFoto.pa, pb:lastFoto.pb, dc:null, dol:null, h:null,
+    pa:lastFoto.noRef?null:lastFoto.pa, pb:lastFoto.noRef?null:lastFoto.pb, dc:null, dol:null, h:null,
     cot:lastFotoCot, cls:b.cls, label:b.label, img:snapshot()});
 });
 
