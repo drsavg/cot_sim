@@ -16,8 +16,8 @@
   html{-webkit-text-size-adjust:100%}
   html{background:var(--paper);min-height:100%}
   body{min-height:100vh;background:var(--paper);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:24px}
-  header{background:var(--card);border-bottom:1px solid var(--line);padding:16px;display:flex;gap:14px;align-items:center}
-  .docChip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;background:#EEF2F5;color:var(--navy);border-radius:980px;padding:4px 12px;font-size:11.5px;font-weight:600}
+  header{position:relative;background:var(--card);border-bottom:1px solid var(--line);padding:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .docChip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;background:#EEF2F5;color:var(--navy);border-radius:980px;padding:4px 12px;font-size:11.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .docChip .okmark{color:#1E8A4C;font-weight:800}
   .escwrap{flex:none;display:flex;align-items:center}
   .escwrap img{height:72px;width:auto;opacity:.75}
@@ -25,7 +25,13 @@
   .eyebrow{font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--navy);font-weight:700;line-height:1.25}
   h1{font-size:21px;line-height:1.16;letter-spacing:-.022em;font-weight:600;margin:2px 0 1px;color:#3A3A3C}
   .sub{font-size:11px;color:var(--mut);margin-top:1px}
-  #gearBtn{flex:none;align-self:center;border:0;background:#E8E8ED;border-radius:980px;width:36px;height:36px;font-size:16px;color:#1D1D1F;cursor:pointer}
+  #gearBtn{position:absolute;top:10px;right:12px;border:0;background:#E8E8ED;border-radius:980px;width:34px;height:34px;font-size:15px;color:#1D1D1F;cursor:pointer}
+  .stuSel{margin-left:auto;margin-right:44px;align-self:flex-end;display:flex;flex-direction:column;align-items:flex-end;gap:3px;max-width:46%}
+  .ssLab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut3);font-weight:600}
+  #stuSelect{font-size:12px;padding:6px 9px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);max-width:100%}
+  .stuRow{display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px solid var(--line);font-size:14px}
+  .stuRow button{border:0;background:none;font-size:15px;cursor:pointer;padding:4px}
+  .stuRow .ed{color:var(--navy)}.stuRow .del{color:var(--rojo)}
   nav.tabs{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
   nav.tabs button{flex:1;border:0;background:none;padding:12px 4px;font-size:15px;font-weight:600;color:var(--mut);border-bottom:2px solid transparent;cursor:pointer}
   nav.tabs button.on{color:var(--navy);border-bottom-color:var(--navy)}
@@ -135,6 +141,10 @@
     <div class="sub">Preparación biológica en tubo de acrílico · Prótesis Fija</div>
     <div id="docChip" class="docChip" hidden></div>
   </div>
+  <div class="stuSel">
+    <span class="ssLab">Evaluando a</span>
+    <select id="stuSelect"><option value="">— seleccionar estudiante —</option></select>
+  </div>
   <button id="gearBtn" aria-label="Ajustar umbrales">⚙</button>
 </header>
 
@@ -145,11 +155,6 @@
 </nav>
 
 <main>
-
-<div class="card alBar" id="alBar">
-  <label class="f" for="alGlobal">Alumno/a</label>
-  <input type="text" id="alGlobal" autocomplete="off" placeholder="Nombre o n° de lista">
-</div>
 
 <!-- ============ FOTO ============ -->
 <section id="tab-foto">
@@ -243,10 +248,18 @@
   <div class="card">
     <h2>Registros de la sesión</h2>
     <div class="note">Los registros viven mientras esta página esté abierta. Exporta el PDF o el CSV antes de cerrar o recargar.</div>
+    <div>
+      <label class="f" for="newStu">Agregar estudiante</label>
+      <div class="row" style="flex-wrap:nowrap;gap:8px;margin-bottom:6px">
+        <input type="text" id="newStu" autocomplete="off" maxlength="40" placeholder="Nombre o n° de lista" style="flex:1">
+        <button class="sec" id="addStu">Agregar</button>
+      </div>
+      <div id="rosterWrap"></div>
+    </div>
     <div class="row" style="margin-bottom:10px">
-      <div style="flex:1;min-width:150px"><label class="f" for="docente">Docente (se completa una vez)</label><input type="text" id="docente" autocomplete="off" placeholder="Nombre del docente"></div>
-      <div style="flex:1;min-width:150px"><label class="f" for="filtAl">Filtrar por alumno/a</label><select id="filtAl"><option value="">Todos</option></select></div>
-      <div style="flex:1;min-width:150px"><label class="f" for="claveCurso">Clave del curso (para la planilla)</label><input type="password" id="claveCurso" autocomplete="off" placeholder="Clave acordada"></div>
+      <div style="flex:1;min-width:150px"><label class="f" for="docente">Docente (se completa una vez)</label><input type="text" id="docente" autocomplete="off" maxlength="40" placeholder="Nombre del docente"></div>
+      <div style="flex:1;min-width:150px"><label class="f" for="filtAl">Filtrar por estudiante</label><select id="filtAl"><option value="">Todos</option></select></div>
+      <div style="flex:1;min-width:150px"><label class="f" for="claveCurso">Clave del curso (para la planilla)</label><input type="password" id="claveCurso" autocomplete="off" maxlength="30" placeholder="Clave acordada"></div>
     </div>
     <div id="regTableWrap"><div class="empty">Aún no hay mediciones guardadas.</div></div>
     <div class="row btns">
@@ -254,8 +267,9 @@
       <button class="sec" id="sheetBtn" hidden>Enviar a planilla</button>
       <button class="sec" id="csvBtn">Exportar CSV</button>
       <button class="sec" id="clearBtn">Borrar todo</button>
+      <button class="sec" id="undoDel" disabled>Deshacer eliminación</button>
     </div>
-    <p class="hint">El PDF exporta lo que muestra el filtro: elige un alumno para su informe individual, o "Todos" para un informe por alumno en páginas separadas. El CSV lleva solo los números (ideal para la planilla); las fotos van en el PDF.</p>
+    <p class="hint">El PDF exporta lo que muestra el filtro: elige un o una estudiante para su informe individual, o "Todos" para un informe por estudiante en páginas separadas. El CSV lleva solo los números (ideal para la planilla); las fotos van en el PDF.</p>
   </div>
 </section>
 
@@ -283,7 +297,7 @@
 <div class="dlg" id="editDlg" hidden>
   <div class="box">
     <div class="dlgHead"><h3>Editar registro</h3><button class="xbtn" id="eClose" aria-label="Cerrar">✕</button></div>
-    <div class="fw"><label class="f" for="eAl">Alumno/a</label><input type="text" id="eAl" autocomplete="off"></div>
+    <div class="fw"><label class="f" for="eAl">Estudiante</label><input type="text" id="eAl" autocomplete="off" maxlength="40"></div>
     <div class="fw"><label class="f" for="eTerm">Terminación</label>
       <select id="eTerm">
         <option>Chamfer profundo</option><option>Chamfer simple</option>
@@ -309,6 +323,8 @@ const SHEETS_URL = "https://script.google.com/macros/s/AKfycbyLxmOgCZ1F8UqQ1hy7r
 const T = { vmin: 3, verde: 6, amar: 12 };
 const num = v => parseFloat(String(v ?? "").trim().replace(",", "."));
 const records = [];               // solo en memoria durante la sesión
+const roster = [];                // listado de estudiantes del docente
+const undoStack = [];             // eliminaciones reversibles (Ctrl+Z)
 const $ = id => document.getElementById(id);
 
 /* ---------- tabs ---------- */
@@ -317,7 +333,6 @@ document.querySelectorAll("nav.tabs button").forEach(b=>{
     document.querySelectorAll("nav.tabs button").forEach(x=>x.classList.remove("on"));
     b.classList.add("on");
     ["foto","calc","reg"].forEach(t=>{ $("tab-"+t).hidden = (b.dataset.tab!==t); });
-    $("alBar").hidden = (b.dataset.tab==="reg");
   });
 });
 
@@ -403,15 +418,79 @@ function renderRecords(){
       <td><button class="ed" aria-label="Editar" data-ed="${i}">✎</button><button class="del" aria-label="Eliminar" data-del="${i}">✕</button></td>
     </tr>`;
   }).join("");
-  w.innerHTML = `<table><thead><tr><th></th><th>Alumno/a</th><th>Preparación</th><th>COT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  w.innerHTML = `<table><thead><tr><th></th><th>Estudiante</th><th>Preparación</th><th>COT</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
   w.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
-    if(confirm("¿Eliminar este registro?")){ records.splice(+b.dataset.del,1); renderRecords(); }
+    const i=+b.dataset.del;
+    if(confirm("¿Eliminar este registro?")){
+      pushUndo({type:"record", rec:records[i], index:i});
+      records.splice(i,1); renderRecords();
+    }
   }));
   w.querySelectorAll("[data-ed]").forEach(b=>b.addEventListener("click",()=>openEdit(+b.dataset.ed)));
+  updateUndoBtn();
 }
 $("filtAl").addEventListener("change",renderRecords);
 $("clearBtn").addEventListener("click",()=>{
-  if(records.length && confirm("¿Borrar los "+records.length+" registros de la sesión?")){ records.length=0; renderRecords(); }
+  if(records.length && confirm("¿Borrar los "+records.length+" registros de la sesión?")){
+    pushUndo({type:"all", data:records.slice()});
+    records.length=0; renderRecords();
+  }
+});
+
+/* ---------- listado de estudiantes ---------- */
+function renderRoster(){
+  const w=$("rosterWrap");
+  w.innerHTML = roster.map((n,i)=>`<div class="stuRow"><span>${esc(n)}</span><span><button class="ed" data-red="${i}" aria-label="Editar">✎</button><button class="del" data-rdel="${i}" aria-label="Eliminar">✕</button></span></div>`).join("");
+  w.querySelectorAll("[data-red]").forEach(b=>b.addEventListener("click",()=>editStu(+b.dataset.red)));
+  w.querySelectorAll("[data-rdel]").forEach(b=>b.addEventListener("click",()=>delStu(+b.dataset.rdel)));
+  const sel=$("stuSelect"), cur=sel.value;
+  sel.innerHTML='<option value="">— seleccionar estudiante —</option>'+roster.map(n=>`<option${n===cur?" selected":""}>${esc(n)}</option>`).join("");
+  if(cur && !roster.includes(cur)) sel.value="";
+  updateUndoBtn();
+}
+$("addStu").addEventListener("click",()=>{
+  const n=$("newStu").value.trim().slice(0,40);
+  if(!n){ toast("Escribe un nombre primero"); return; }
+  if(roster.some(x=>x.toLowerCase()===n.toLowerCase())){ toast("Ese nombre ya está en el listado"); return; }
+  roster.push(n); $("newStu").value="";
+  renderRoster();
+  $("stuSelect").value=n;
+  toast("Estudiante agregado y seleccionado");
+});
+$("newStu").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("addStu").click(); } });
+function editStu(i){
+  const nuevo = prompt("Editar nombre:", roster[i]);
+  if(nuevo===null) return;
+  const n=nuevo.trim().slice(0,40);
+  if(!n) return;
+  const old=roster[i];
+  roster[i]=n;
+  records.forEach(r=>{ if(r.alumno===old) r.alumno=n; });
+  if($("stuSelect").value===old){ renderRoster(); $("stuSelect").value=n; }
+  renderRoster(); renderRecords();
+}
+function delStu(i){
+  if(!confirm('¿Quitar a "'+roster[i]+'" del listado? (sus registros guardados no se borran)')) return;
+  pushUndo({type:"roster", name:roster[i], index:i});
+  roster.splice(i,1);
+  renderRoster();
+}
+
+/* ---------- deshacer eliminaciones ---------- */
+function pushUndo(a){
+  undoStack.push(a);
+  if(undoStack.length>30) undoStack.shift();
+  updateUndoBtn();
+}
+function updateUndoBtn(){ $("undoDel").disabled = !undoStack.length; }
+$("undoDel").addEventListener("click",()=>{
+  const a=undoStack.pop();
+  if(!a) return;
+  if(a.type==="record") records.splice(Math.min(a.index,records.length),0,a.rec);
+  else if(a.type==="roster") roster.splice(Math.min(a.index,roster.length),0,a.name);
+  else if(a.type==="all") records.push(...a.data);
+  renderRoster(); renderRecords();
+  toast("Eliminación deshecha");
 });
 
 /* edición */
@@ -482,7 +561,7 @@ $("csvBtn").addEventListener("click",()=>{
   if(!list.length){ toast("No hay registros que exportar"); return; }
   const n = v => (v===null||v===undefined)? "" : fmt(v);
   const csvq = s => { s=String(s??""); return /[;"\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s; };
-  const head = "Fecha;Hora;Docente;Alumno;Terminación;Vista;Origen;Pared A (°);Pared B (°);Ø cervical (mm);Ø oclusal (mm);Altura (mm);COT (°);Resultado";
+  const head = "Fecha;Hora;Docente;Estudiante;Terminación;Vista;Origen;Pared A (°);Pared B (°);Ø cervical (mm);Ø oclusal (mm);Altura (mm);COT (°);Resultado";
   const lines = list.map(r=>[r.fecha,r.hora,csvq(r.docente||$("docente").value.trim()),csvq(r.alumno),csvq(r.term),r.vista,r.origen,n(r.pa),n(r.pb),n(r.dc),n(r.dol),n(r.h),n(r.cot),csvq(r.label)].join(";"));
   const blob = new Blob(["\uFEFF"+head+"\n"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
   const a = document.createElement("a");
@@ -513,7 +592,7 @@ function buildPrint(list){
         <div class="pt1">Convergencia oclusal total — preparación biológica</div>
         <div class="pt2">Área de Prótesis Fija · Facultad de Odontología · Universidad de Chile</div>
       </div></div>
-      <div class="meta"><b>Alumno/a:</b> ${esc(al)} &nbsp;&nbsp; <b>Docente:</b> ${esc(doc)} &nbsp;&nbsp; <b>Fecha:</b> ${new Date().toLocaleDateString("es-CL")}</div>`;
+      <div class="meta"><b>Estudiante:</b> ${esc(al)} &nbsp;&nbsp; <b>Docente:</b> ${esc(doc)} &nbsp;&nbsp; <b>Fecha:</b> ${new Date().toLocaleDateString("es-CL")}</div>`;
     rs.forEach((r,i)=>{
       out += `<div class="prep"><div class="pnum">${i+1}. ${esc(r.term)}${r.vista&&r.vista!=="única"?" · vista "+esc(r.vista):""} <span class="orig">(${r.origen} · ${r.fecha} ${r.hora})</span></div>`;
       if(r.img) out += `<img class="ph" src="${r.img}" alt="">`;
@@ -905,7 +984,7 @@ function snapshot(){
 $("fSave").addEventListener("click",()=>{
   if(lastFotoCot===null) return;
   const b=bandOf(lastFotoCot), s=stamp();
-  addRecord({...s, alumno:$("alGlobal").value.trim(), docente:$("docente").value.trim(),
+  addRecord({...s, alumno:$("stuSelect").value, docente:$("docente").value.trim(),
     term:$("fTerm").value, vista:$("fVista").value, origen:"foto",
     pa:lastFoto.noRef?null:lastFoto.pa, pb:lastFoto.noRef?null:lastFoto.pb, dc:null, dol:null, h:null,
     cot:lastFotoCot, cls:b.cls, label:b.label, img:snapshot(), sync:false});
@@ -928,7 +1007,7 @@ function calc(){
 $("cSave").addEventListener("click",()=>{
   if(lastCalcCot===null) return;
   const b=bandOf(lastCalcCot), s=stamp();
-  addRecord({...s, alumno:$("alGlobal").value.trim(), docente:$("docente").value.trim(),
+  addRecord({...s, alumno:$("stuSelect").value, docente:$("docente").value.trim(),
     term:$("cTerm").value, vista:"única", origen:"calibre",
     pa:null, pb:null, dc:lastCalcVals.dc, dol:lastCalcVals.dol, h:lastCalcVals.h,
     cot:lastCalcCot, cls:b.cls, label:b.label, img:null, sync:false});
@@ -945,6 +1024,7 @@ fitEsc();
 setTimeout(fitEsc,150);
 
 syncLock();
+renderRoster();
 </script>
 </body>
 </html>
