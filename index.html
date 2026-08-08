@@ -26,7 +26,11 @@
   h1{font-size:21px;line-height:1.16;letter-spacing:-.022em;font-weight:600;margin:2px 0 1px;color:#3A3A3C}
   .sub{font-size:11px;color:var(--mut);margin-top:1px}
   #gearBtn{position:absolute;top:10px;right:12px;border:0;background:#E8E8ED;border-radius:980px;width:34px;height:34px;font-size:15px;color:#1D1D1F;cursor:pointer}
-  .stuSel{flex-basis:100%;display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px}
+  .stuSel{flex-basis:100%;display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .addRow{display:flex;gap:6px;margin-top:6px}
+  .addRow input{flex:1}
+  .stuSel .addRow{flex-basis:100%;justify-content:flex-end}
+  .stuSel .addRow input{max-width:60%}
   #stuSelect{min-width:0;max-width:62%}
   .ssLab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut3);font-weight:600}
   #stuSelect{font-size:12px;padding:6px 9px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink)}
@@ -144,7 +148,8 @@
   </div>
   <div class="stuSel">
     <span class="ssLab">Evaluando a</span>
-    <select id="stuSelect"><option value="">— seleccionar estudiante —</option></select>
+    <select id="stuSelect" class="stuPick"><option value="">— seleccionar estudiante —</option></select>
+    <div class="addRow" hidden><input type="text" maxlength="40" autocomplete="off" placeholder="Nombre o n° de lista"><button class="sec" type="button">Agregar</button></div>
   </div>
   <button id="gearBtn" aria-label="Ajustar umbrales">⚙</button>
 </header>
@@ -152,7 +157,7 @@
 <nav class="tabs">
   <button data-tab="foto" class="on">Foto</button>
   <button data-tab="calc">Calculadora</button>
-  <button data-tab="reg">Registros (<span id="regCount">0</span>)</button>
+  <button data-tab="reg">Gestión (<span id="regCount">0</span>)</button>
 </nav>
 
 <main>
@@ -201,6 +206,11 @@
         </select></div>
       <div><label class="f" for="fVista">Vista</label>
         <select id="fVista"><option>única</option><option>0°</option><option>90°</option></select></div>
+      <div class="full stuCombo">
+        <label class="f">Estudiante</label>
+        <select class="stuPick" aria-label="Estudiante"></select>
+        <div class="addRow" hidden><input type="text" maxlength="40" autocomplete="off" placeholder="Nombre o n° de lista"><button class="sec" type="button">Agregar</button></div>
+      </div>
       <div class="full"><button class="pri" id="fSave" style="width:100%">Guardar avance</button></div>
     </div>
   </div>
@@ -234,6 +244,11 @@
     <div class="scale" id="cScale"></div>
     <div id="cWarns"></div>
     <div class="saveRow">
+      <div class="full stuCombo">
+        <label class="f">Estudiante</label>
+        <select class="stuPick" aria-label="Estudiante"></select>
+        <div class="addRow" hidden><input type="text" maxlength="40" autocomplete="off" placeholder="Nombre o n° de lista"><button class="sec" type="button">Agregar</button></div>
+      </div>
       <div><label class="f" for="cTerm">Terminación</label>
         <select id="cTerm">
           <option>Chamfer profundo</option><option>Chamfer simple</option>
@@ -438,25 +453,57 @@ $("clearBtn").addEventListener("click",()=>{
   }
 });
 
+/* ---------- selección central de estudiante y combos sincronizados ---------- */
+let curStu = "";
+function buildStuOptions(sel){
+  sel.innerHTML = '<option value="">— seleccionar estudiante —</option>'
+    + roster.map(n=>`<option${n===curStu?" selected":""}>${esc(n)}</option>`).join("")
+    + '<option value="__add__">＋ Agregar estudiante…</option>';
+  if(!roster.includes(curStu)) sel.value="";
+}
+function refreshStuSelects(){ document.querySelectorAll("select.stuPick").forEach(buildStuOptions); }
+function setCurStu(v){ curStu = roster.includes(v)? v : ""; refreshStuSelects(); }
+function addStudent(n){
+  n = n.trim().slice(0,40);
+  if(!n){ toast("Escribe un nombre primero"); return false; }
+  const ex = roster.find(x=>x.toLowerCase()===n.toLowerCase());
+  if(ex){ setCurStu(ex); toast("Ya estaba en el listado: seleccionado"); return true; }
+  roster.push(n);
+  renderRoster();
+  setCurStu(n);
+  toast("Estudiante agregado y seleccionado");
+  return true;
+}
+document.querySelectorAll("select.stuPick").forEach(sel=>{
+  sel.addEventListener("change",()=>{
+    if(sel.value==="__add__"){
+      sel.value = curStu || "";
+      const box = sel.parentElement.querySelector(".addRow");
+      if(box){ box.hidden=false; box.querySelector("input").focus(); }
+    } else setCurStu(sel.value);
+  });
+});
+document.querySelectorAll(".addRow").forEach(box=>{
+  const inp=box.querySelector("input"), btn=box.querySelector("button");
+  const doAdd=()=>{ if(addStudent(inp.value)){ inp.value=""; box.hidden=true; } };
+  btn.addEventListener("click",doAdd);
+  inp.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){ e.preventDefault(); doAdd(); }
+    if(e.key==="Escape"){ inp.value=""; box.hidden=true; }
+  });
+});
+
 /* ---------- listado de estudiantes ---------- */
 function renderRoster(){
   const w=$("rosterWrap");
   w.innerHTML = roster.map((n,i)=>`<div class="stuRow"><span>${esc(n)}</span><span><button class="ed" data-red="${i}" aria-label="Editar">✎</button><button class="del" data-rdel="${i}" aria-label="Eliminar">✕</button></span></div>`).join("");
   w.querySelectorAll("[data-red]").forEach(b=>b.addEventListener("click",()=>editStu(+b.dataset.red)));
   w.querySelectorAll("[data-rdel]").forEach(b=>b.addEventListener("click",()=>delStu(+b.dataset.rdel)));
-  const sel=$("stuSelect"), cur=sel.value;
-  sel.innerHTML='<option value="">— seleccionar estudiante —</option>'+roster.map(n=>`<option${n===cur?" selected":""}>${esc(n)}</option>`).join("");
-  if(cur && !roster.includes(cur)) sel.value="";
+  refreshStuSelects();
   updateUndoBtn();
 }
 $("addStu").addEventListener("click",()=>{
-  const n=$("newStu").value.trim().slice(0,40);
-  if(!n){ toast("Escribe un nombre primero"); return; }
-  if(roster.some(x=>x.toLowerCase()===n.toLowerCase())){ toast("Ese nombre ya está en el listado"); return; }
-  roster.push(n); $("newStu").value="";
-  renderRoster();
-  $("stuSelect").value=n;
-  toast("Estudiante agregado y seleccionado");
+  if(addStudent($("newStu").value)) $("newStu").value="";
 });
 $("newStu").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("addStu").click(); } });
 function editStu(i){
@@ -467,13 +514,14 @@ function editStu(i){
   const old=roster[i];
   roster[i]=n;
   records.forEach(r=>{ if(r.alumno===old) r.alumno=n; });
-  if($("stuSelect").value===old){ renderRoster(); $("stuSelect").value=n; }
+  if(curStu===old) curStu=n;
   renderRoster(); renderRecords();
 }
 function delStu(i){
   if(!confirm('¿Quitar a "'+roster[i]+'" del listado? (sus registros guardados no se borran)')) return;
   pushUndo({type:"roster", name:roster[i], index:i});
   roster.splice(i,1);
+  if(!roster.includes(curStu)) curStu="";
   renderRoster();
 }
 
@@ -984,8 +1032,9 @@ function snapshot(){
 
 $("fSave").addEventListener("click",()=>{
   if(lastFotoCot===null) return;
+  if(!curStu){ toast("Selecciona o agrega un estudiante antes de guardar"); return; }
   const b=bandOf(lastFotoCot), s=stamp();
-  addRecord({...s, alumno:$("stuSelect").value, docente:$("docente").value.trim(),
+  addRecord({...s, alumno:curStu, docente:$("docente").value.trim(),
     term:$("fTerm").value, vista:$("fVista").value, origen:"foto",
     pa:lastFoto.noRef?null:lastFoto.pa, pb:lastFoto.noRef?null:lastFoto.pb, dc:null, dol:null, h:null,
     cot:lastFotoCot, cls:b.cls, label:b.label, img:snapshot(), sync:false});
@@ -1007,8 +1056,9 @@ function calc(){
 }
 $("cSave").addEventListener("click",()=>{
   if(lastCalcCot===null) return;
+  if(!curStu){ toast("Selecciona o agrega un estudiante antes de guardar"); return; }
   const b=bandOf(lastCalcCot), s=stamp();
-  addRecord({...s, alumno:$("stuSelect").value, docente:$("docente").value.trim(),
+  addRecord({...s, alumno:curStu, docente:$("docente").value.trim(),
     term:$("cTerm").value, vista:"única", origen:"calibre",
     pa:null, pb:null, dc:lastCalcVals.dc, dol:lastCalcVals.dol, h:lastCalcVals.h,
     cot:lastCalcCot, cls:b.cls, label:b.label, img:null, sync:false});
